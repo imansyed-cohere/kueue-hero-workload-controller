@@ -37,7 +37,7 @@ This controller is the stopgap from the design doc *Hero Workloads on Kueue TAS:
 ## 4. Decisions already settled
 
 - **Compatible with kueue 0.16.9 (customer's current version) through the 0.19 releases.** Pin the `sigs.k8s.io/kueue v0.16.9` Go module and build against **v1beta2**: verified by diffing the tags, the v1beta2 wire format is purely additive from 0.16.9 through the current development branch (0.20-devel) for every field we use (`spec.priorityClassRef`, `spec.active`, compressed `TopologyAssignment`, conditions, CQ quotas, Topology levels), so one binary serves all of them. E2e-verified against 0.16.9, 0.18.6, and 0.19.2 (0.20 is unreleased as of 2026-08-28).
-- **Version-spanning stuck detection.** 0.16.9 stamps every pending Workload with condition reason literal `"Pending"`; 0.19+ uses granular `TopologyPlacementFailed`. Detection mode `auto` (default) treats a Workload as TAS-stuck if reason == `TopologyPlacementFailed` **or** (reason == `Pending` and message matches `couldn't assign flavors to pod set …: topology … doesn't allow to fit`). Explicit `message`/`reason` modes remain for pinning.
+- **Version-spanning stuck detection.** 0.16.9 stamps every pending Workload with condition reason literal `"Pending"`; 0.19+ uses granular `TopologyPlacementFailed`, or `WaitingForQuota` when the hero's quota is lent out and kueue finds no preemption candidates. Detection mode `auto` (default) treats a Workload as TAS-stuck if reason == `TopologyPlacementFailed` **or** (reason == `WaitingForQuota` and the message is an `insufficient unused quota` shortfall with no preemption in flight) **or** (reason == `Pending` and message matches `couldn't assign flavors to pod set …: topology … doesn't allow to fit`). Explicit `message`/`reason` modes remain for pinning.
 - **`kubebuilder init` scaffold**; unused CRD/webhook machinery deleted.
 - **OPA policies out of scope** (follow-up, lives with cluster policy).
 - **kind e2e included** as final milestone — validates message-match detection against real kueue output, the riskiest assumption.
@@ -57,7 +57,7 @@ This controller is the stopgap from the design doc *Hero Workloads on Kueue TAS:
 ### M2 — Hero identification & stuck detection (pure)
 `pkg/hero/`:
 - `IsHero(wl, cq, cfg)` — CQ label `hero.coreweave.com/enabled=true`; `spec.priorityClassRef` is a `WorkloadPriorityClass` named `hero-critical`; every podset carrying the slice pair (`podset-slice-required-topology` + `podset-slice-size`) tolerates the taint key — podsets without the slice pair are never placed in a drained domain, so their tolerations are not checked.
-- `IsStuckTASNoFit(wl, mode)` — strategy interface: `auto` (default; reason `TopologyPlacementFailed` OR `Pending`+message-match) / `message` / `reason`.
+- `IsStuckTASNoFit(wl, mode)` — strategy interface: `auto` (default; reason `TopologyPlacementFailed` OR `WaitingForQuota`+unused-quota message OR `Pending`+message-match) / `message` / `reason`.
 - `RequiredTopologyLevels(wl)`: the drain trigger is the SLICE PAIR only — `topologyRequest.podSetSliceRequiredTopology` + `podSetSliceSize` both set (customer-confirmed hero contract; plain `required` never triggers). `CoarsestLevel` picks the drain level when podsets disagree (Topology `spec.levels` is ordered highest→lowest). `GPURequest(wl)`; `HeroPriority(wl)` from `spec.priority`.
 - Test fixtures: kueue's own wrappers (`sigs.k8s.io/kueue/pkg/util/testing/v1beta2`).
 

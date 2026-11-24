@@ -25,6 +25,16 @@ const (
 	msg016PreemptionPending = `couldn't assign flavors to pod set main: insufficient unused quota for nvidia.com/gpu in flavor gpu-flavor, 8 more needed. Pending the preemption of 2 workload(s)`
 )
 
+// Condition messages observed on kueue 0.20.6 for a segmented hero whose
+// ClusterQueue had lent its quota out and for which kueue found no
+// preemption candidates (requeueReason PreemptionNoCandidates).
+const (
+	msg020UnusedQuotaNoCandidates = `couldn't assign flavors to pod set worker: Flavor "cpu-flavor" does not contain the requested level, insufficient unused quota for nvidia.com/gpu in flavor gpu-flavor, 256 more needed; couldn't assign flavors to pod set sampler: Flavor "cpu-flavor" does not contain the requested level, insufficient unused quota for nvidia.com/gpu in flavor gpu-flavor, 433 more needed`
+	msg020MaxCapacity             = `couldn't assign flavors to pod set main: insufficient quota for nvidia.com/gpu in flavor gpu-flavor, previously considered podsets requests (0) + current podset request (24) > maximum capacity (16)`
+	msg020DeferredMidCycle        = `Workload was evaluated mid-cycle and is deferred to the next scheduling cycle: couldn't assign flavors to pod set main: insufficient unused quota for nvidia.com/gpu in flavor gpu-flavor, 8 more needed`
+	msg020OverlappingTargets      = `Workload has overlapping preemption targets with another workload`
+)
+
 func testConfig() *config.Config {
 	cfg := config.Default()
 	return &cfg

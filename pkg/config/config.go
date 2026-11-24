@@ -44,22 +44,27 @@ import (
 //     the only signal that exists on 0.16.
 //   - Kueue 0.19+: granular condition reasons exist and are on by default
 //     (feature gate UnadmittedWorkloadsObservability); a TAS no-fit is
-//     reason "TopologyPlacementFailed". No text matching needed.
+//     reason "TopologyPlacementFailed". A hero whose quota is lent out
+//     and for which kueue finds no victim set that also fits the
+//     topology is instead reason "WaitingForQuota" with an "insufficient
+//     unused quota" message; that case still needs the message to tell
+//     it apart from a pure quota wait.
 type DetectionMode string
 
 const (
 	// DetectionAuto matches either version's signal: the granular
-	// TopologyPlacementFailed reason (kueue >= 0.19) OR the legacy
-	// "Pending" reason combined with a TAS no-fit message (kueue 0.16).
-	// Works on both, survives a kueue upgrade with no config change.
+	// reasons (kueue >= 0.19) OR the legacy "Pending" reason combined
+	// with a TAS no-fit message (kueue 0.16). Works on both, survives a
+	// kueue upgrade with no config change.
 	DetectionAuto DetectionMode = "auto"
 	// DetectionMessage matches only the legacy 0.16-style message text.
 	// Pin this if a future kueue version ever makes the reason-based
 	// match misfire.
 	DetectionMessage DetectionMode = "message"
-	// DetectionReason matches only the granular condition reason
-	// (kueue >= 0.19). Strictest; the right choice after the cluster is
-	// upgraded, when text matching should be dead code.
+	// DetectionReason matches only the granular condition reasons
+	// (kueue >= 0.19): TopologyPlacementFailed, or WaitingForQuota with
+	// an unused-quota shortfall and no preemption in flight. The right
+	// choice after the cluster is upgraded.
 	DetectionReason DetectionMode = "reason"
 )
 

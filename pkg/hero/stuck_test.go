@@ -83,6 +83,64 @@ func TestIsStuckTASNoFit(t *testing.T) {
 			},
 		},
 		{
+			name: "0.20 unused quota shortfall with no preemption candidates matches",
+			wl:   heroWorkload().Condition(pendingCondition("WaitingForQuota", msg020UnusedQuotaNoCandidates)).Obj(),
+			want: map[config.DetectionMode]bool{
+				config.DetectionAuto:    true,
+				config.DetectionReason:  true,
+				config.DetectionMessage: false,
+			},
+		},
+		{
+			name: "0.20 WaitingForQuota over maximum capacity must NOT match",
+			wl:   heroWorkload().Condition(pendingCondition("WaitingForQuota", msg020MaxCapacity)).Obj(),
+			want: map[config.DetectionMode]bool{
+				config.DetectionAuto:    false,
+				config.DetectionReason:  false,
+				config.DetectionMessage: false,
+			},
+		},
+		{
+			name: "0.20 ExceedsMaxQuota must NOT match",
+			wl:   heroWorkload().Condition(pendingCondition("ExceedsMaxQuota", msg020MaxCapacity)).Obj(),
+			want: map[config.DetectionMode]bool{
+				config.DetectionAuto:   false,
+				config.DetectionReason: false,
+			},
+		},
+		{
+			name: "0.20 preemption in flight must NOT match",
+			wl:   heroWorkload().Condition(pendingCondition("WaitingForPreemptedWorkloads", msg020UnusedQuotaNoCandidates)).Obj(),
+			want: map[config.DetectionMode]bool{
+				config.DetectionAuto:   false,
+				config.DetectionReason: false,
+			},
+		},
+		{
+			name: "0.20 WaitingForQuota with preemption pending text must NOT match",
+			wl:   heroWorkload().Condition(pendingCondition("WaitingForQuota", msg016PreemptionPending)).Obj(),
+			want: map[config.DetectionMode]bool{
+				config.DetectionAuto:   false,
+				config.DetectionReason: false,
+			},
+		},
+		{
+			name: "0.20 mid-cycle deferral must NOT match",
+			wl:   heroWorkload().Condition(pendingCondition("WaitingForQuota", msg020DeferredMidCycle)).Obj(),
+			want: map[config.DetectionMode]bool{
+				config.DetectionAuto:   false,
+				config.DetectionReason: false,
+			},
+		},
+		{
+			name: "0.20 overlapping preemption targets must NOT match",
+			wl:   heroWorkload().Condition(pendingCondition("WaitingForQuota", msg020OverlappingTargets)).Obj(),
+			want: map[config.DetectionMode]bool{
+				config.DetectionAuto:   false,
+				config.DetectionReason: false,
+			},
+		},
+		{
 			name: "no QuotaReserved condition at all",
 			wl:   heroWorkload().Obj(),
 			want: map[config.DetectionMode]bool{

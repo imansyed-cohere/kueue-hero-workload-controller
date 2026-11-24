@@ -22,6 +22,13 @@ const (
 	// declared here; kueue 0.16.9 servers never produce it.
 	reasonTopologyPlacementFailed = "TopologyPlacementFailed"
 
+	// reasonWaitingForQuota is the granular QuotaReserved=False reason
+	// kueue >= 0.19 stamps when a workload needs preemption to get quota
+	// but has none in flight, including when no victim set frees enough
+	// topology (requeueReason PreemptionNoCandidates). The message is the
+	// same flavor-assignment text 0.16 used under reasonPending.
+	reasonWaitingForQuota = "WaitingForQuota"
+
 	// reasonPending is the catch-all QuotaReserved=False reason kueue
 	// 0.16.x stamps for every not-admitted cause; the message must be
 	// inspected to tell a TAS no-fit apart from quota starvation.
@@ -43,6 +50,9 @@ const (
 	msgTopologyNoFitPartial    = "allows to fit only"
 	msgInsufficientUnusedQuota = "insufficient unused quota"
 	msgKueuePreempting         = "Pending the preemption of"
+	// Prefix kueue >= 0.19 puts on a one-cycle WaitingForQuota deferral
+	// (pkg/scheduler/scheduler.go); the next cycle stamps the real cause.
+	msgKueueDeferredMidCycle = "deferred to the next scheduling cycle"
 )
 
 // IsStuckTASNoFit reports whether the Workload is pending specifically
@@ -60,7 +70,8 @@ func IsStuckTASNoFit(wl *kueue.Workload, mode config.DetectionMode) bool {
 		return false
 	}
 
-	byReason := cond.Reason == reasonTopologyPlacementFailed
+	byReason := cond.Reason == reasonTopologyPlacementFailed ||
+		(cond.Reason == reasonWaitingForQuota && messageIsUnusedQuotaShortfall(cond.Message))
 	byMessage := cond.Reason == reasonPending && messageIsTASNoFit(cond.Message)
 
 	switch mode {
@@ -84,9 +95,16 @@ func messageIsTASNoFit(msg string) bool {
 	if strings.Contains(msg, msgTopologyNoFitAny) || strings.Contains(msg, msgTopologyNoFitPartial) {
 		return true
 	}
-	// Quota exists but is in use. Draining helps only while kueue has not
-	// already targeted victims of its own: once it is preempting, the
-	// quota frees up without us evicting anyone.
-	return strings.Contains(msg, msgInsufficientUnusedQuota) &&
-		!strings.Contains(msg, msgKueuePreempting)
+	return messageIsUnusedQuotaShortfall(msg)
+}
+
+// messageIsUnusedQuotaShortfall reports whether a flavor-assignment message
+// says quota exists but is in use. Draining helps only while kueue has not
+// already targeted victims of its own: once it is preempting, the quota
+// frees up without us evicting anyone.
+func messageIsUnusedQuotaShortfall(msg string) bool {
+	return strings.Contains(msg, msgCouldntAssignFlavors) &&
+		strings.Contains(msg, msgInsufficientUnusedQuota) &&
+		!strings.Contains(msg, msgKueuePreempting) &&
+		!strings.Contains(msg, msgKueueDeferredMidCycle)
 }
